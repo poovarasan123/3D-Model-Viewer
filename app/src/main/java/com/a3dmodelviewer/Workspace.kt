@@ -1,5 +1,6 @@
 package com.a3dmodelviewer
 
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,15 +14,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +57,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.filament.Engine
+import com.google.android.filament.IndirectLight
+import com.google.android.filament.Skybox
 import io.github.sceneview.Scene
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.loaders.ModelLoader
@@ -90,7 +97,9 @@ fun Workspace() {
     var menuOpen by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
         val screenW = constraints.maxWidth.toFloat()
         val screenH = constraints.maxHeight.toFloat()
@@ -110,15 +119,32 @@ fun Workspace() {
             }
         }
 
-        Box(Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(16.dp)) {
-            Button(onClick = { menuOpen = true }) { Text("Add model") }
+        Box(Modifier
+            .align(Alignment.TopCenter)
+            .systemBarsPadding()
+            .padding(16.dp)) {
+            Button(
+                onClick = { menuOpen = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Add model") }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 available.forEach { file ->
+                    val path = "$MODEL_DIR/$file"
+                    val name = file.removeSuffix(".glb")
+                    val alreadyAdded = placed.any { it.assetPath == path }
+
                     DropdownMenuItem(
-                        text = { Text(file.removeSuffix(".glb")) },
+                        text = { Text(name) },
+                        trailingIcon = {
+                            if (alreadyAdded) Icon(Icons.Default.Check, contentDescription = "Added")
+                        },
                         onClick = {
-                            placed += PlacedModel(nextId++, "$MODEL_DIR/$file", file.removeSuffix(".glb"))
                             menuOpen = false
+                            if (alreadyAdded) {
+                                Toast.makeText(context, "$name is already added", Toast.LENGTH_SHORT).show()
+                            } else {
+                                placed += PlacedModel(nextId++, path, name)
+                            }
                         }
                     )
                 }
@@ -148,6 +174,7 @@ private fun ModelContainer(
     var offset by remember {
         mutableStateOf(Offset(40f + 48f * (index % 6), 160f + 48f * (index % 6)))
     }
+
     fun clamp(o: Offset, size: Float) = Offset(
         o.x.coerceIn(0f, (screenW - size).coerceAtLeast(0f)),
         o.y.coerceIn(0f, (screenH - size).coerceAtLeast(0f))
@@ -163,8 +190,9 @@ private fun ModelContainer(
 
     // ---- 3D resources ----
     val instance = rememberModelInstance(modelLoader, model.assetPath)
-    val cameraNode = rememberCameraNode(engine) { position =
-        io.github.sceneview.math.Position(0f, 0f, 2.5f)
+    val cameraNode = rememberCameraNode(engine) {
+        position =
+            io.github.sceneview.math.Position(0f, 0f, 2.5f)
     }
     val projector = remember(engine) { LabelProjector(engine) }
 
@@ -181,7 +209,12 @@ private fun ModelContainer(
 
     Box(
         Modifier
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }  // layout phase only
+            .offset {
+                IntOffset(
+                    offset.x.roundToInt(),
+                    offset.y.roundToInt()
+                )
+            }  // layout phase only
             .size(with(density) { sizePx.toDp() })
             .border(
                 2.dp,
@@ -224,44 +257,49 @@ private fun ModelContainer(
 
         // ---- gesture layer: the ONLY place where the two modes are decided ----
         Box(
-            Modifier.fillMaxSize().pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    do {
-                        val event = awaitPointerEvent()
-                        val fingers = event.changes.count { it.pressed }
-                        if (fingers >= 2) {
-                            val zoom = event.calculateZoom()
-                            if (zoom != 1f) {
-                                if (interaction) {
-                                    distance = (distance / zoom).coerceIn(0.8f, 8f)
-                                } else {
-                                    val newSize = (sizePx * zoom).coerceIn(minSize, maxSize)
-                                    val d = newSize - sizePx
-                                    offset = clamp(offset - Offset(d / 2f, d / 2f), newSize)
-                                    sizePx = newSize                    // content scales with the view
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            val fingers = event.changes.count { it.pressed }
+                            if (fingers >= 2) {
+                                val zoom = event.calculateZoom()
+                                if (zoom != 1f) {
+                                    if (interaction) {
+                                        distance = (distance / zoom).coerceIn(0.8f, 8f)
+                                    } else {
+                                        val newSize = (sizePx * zoom).coerceIn(minSize, maxSize)
+                                        val d = newSize - sizePx
+                                        offset = clamp(offset - Offset(d / 2f, d / 2f), newSize)
+                                        sizePx =
+                                            newSize                    // content scales with the view
+                                    }
+                                }
+                            } else if (fingers == 1) {
+                                val pan = event.calculatePan()
+                                if (pan != Offset.Zero) {
+                                    if (interaction) {
+                                        yaw += pan.x * 0.4f
+                                        pitch = (pitch + pan.y * 0.4f).coerceIn(-89f, 89f)
+                                    } else {
+                                        offset = clamp(offset + pan, sizePx)
+                                    }
                                 }
                             }
-                        } else if (fingers == 1) {
-                            val pan = event.calculatePan()
-                            if (pan != Offset.Zero) {
-                                if (interaction) {
-                                    yaw += pan.x * 0.4f
-                                    pitch = (pitch + pan.y * 0.4f).coerceIn(-89f, 89f)
-                                } else {
-                                    offset = clamp(offset + pan, sizePx)
-                                }
-                            }
-                        }
-                        event.changes.forEach { if (it.positionChanged()) it.consume() }
-                    } while (event.changes.any { it.pressed })
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        } while (event.changes.any { it.pressed })
+                    }
                 }
-            }
         )
 
         // ---- three always-visible buttons (above the gesture layer) ----
         Row(
-            Modifier.align(Alignment.TopEnd).padding(4.dp),
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             RoundButton("↻", active = interaction) { interaction = !interaction }

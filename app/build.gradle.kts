@@ -1,30 +1,60 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use {
+        localProperties.load(it)
+    }
+}
+
 android {
-    namespace = "com.a3dmodelviewer"
+    namespace = localProperties.getProperty("applicationId")
     compileSdk {
-        version = release(37)
+        version = release(localProperties.getProperty("compileSDK").toInt())
     }
 
     defaultConfig {
-        applicationId = "com.a3dmodelviewer"
-        minSdk = 24
-        targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        applicationId = localProperties.getProperty("applicationId")
+        minSdk = localProperties.getProperty("minSDK").toInt()
+        targetSdk = localProperties.getProperty("targetSDK").toInt()
+        versionCode = localProperties.getProperty("versionCode").toInt()
+        versionName = localProperties.getProperty("versionName")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("dev") {
+            storeFile = localProperties.getProperty("signing.dev.storeFile")?.let { file(it) }
+            storePassword = localProperties.getProperty("signing.dev.storePassword")
+            keyAlias = localProperties.getProperty("signing.dev.keyAlias")
+            keyPassword = localProperties.getProperty("signing.dev.keyPassword")
+        }
+        create("prod") {
+            storeFile = localProperties.getProperty("signing.prod.storeFile")?.let { file(it) }
+            storePassword = localProperties.getProperty("signing.prod.storePassword")
+            keyAlias = localProperties.getProperty("signing.prod.keyAlias")
+            keyPassword = localProperties.getProperty("signing.prod.keyPassword")
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("dev")
+        }
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("prod")
             optimization {
                 enable = false
             }
-            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -37,6 +67,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
