@@ -1,2 +1,0 @@
-- `[x]` Enable `isEditable` and `isPositionEditable` for models in `Scene` block
-- `[x]` Verify changes by building the project
