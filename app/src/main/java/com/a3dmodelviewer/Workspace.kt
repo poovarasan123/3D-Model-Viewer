@@ -57,8 +57,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.filament.Engine
-import com.google.android.filament.IndirectLight
-import com.google.android.filament.Skybox
 import io.github.sceneview.Scene
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.loaders.ModelLoader
@@ -298,9 +296,9 @@ private fun ModelContainer(
         // ---- three always-visible buttons (above the gesture layer) ----
         Row(
             Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.BottomCenter)
                 .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             RoundButton("↻", active = interaction) { interaction = !interaction }
             RoundButton("Aa", active = labelsOn) { labelsOn = !labelsOn }

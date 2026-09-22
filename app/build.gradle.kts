@@ -91,10 +91,6 @@ dependencies {
 
 
 
-    implementation(libs.filament.android.v160)
-    implementation(libs.filament.utils.android)
-    implementation(libs.gltfio.android.v160)
-
     implementation(libs.androidx.compose.material.icon.extended)
 
     implementation(libs.sceneview)

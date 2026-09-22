@@ -14,8 +14,24 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
+-keep public class * extends java.lang.Exception
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Rename hidden source file
+-renamesourcefileattribute SourceFile
+
+# Keep app classes
+-keep public class com.a3dmodelviewer.** { *; }
+
+# Keep Filament native methods
+-keepclasseswithmembernames, includedescriptorclasses class com.google.android.filament.** {
+    native <methods>;
+}
+
+# Keep Filament reflection markers
+-keep class com.google.android.filament.proguard.UsedByNative { *; }
+-keep class com.google.android.filament.proguard.UsedByReflection { *; }
+
+# Keep SceneView
+-keep class io.github.sceneview.** { *; }
+-keepclassmembers class io.github.sceneview.node.ModelNode { *; }
